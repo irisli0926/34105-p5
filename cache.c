@@ -108,7 +108,27 @@ unsigned long get_cache_block_addr(cache_t *cache, unsigned long addr) {
  */
 bool access_cache(cache_t *cache, unsigned long addr, enum action_t action) {
   // FIX THIS CODE!
+  unsigned long index = get_cache_index(cache, addr);
+  unsigned long tag = get_cache_tag(cache, addr);
 
+  // get array of lines to search
+  cache_line_t *sets_for_index = cache->lines[index];
+  cache_line_t *line = NULL; // indicator: if still null after search, address not found
 
-  return true;  // cache hit should return true
+  // for every way in the cache:
+  for (int way_no = 0; way_no < cache->assoc; way_no++){
+    // if a way has a tag, set the indicator
+    if (sets_for_index[way_no].tag == tag){
+      line = &sets_for_index[way_no];
+    }
+  }
+  // if line is still null, nothing found
+
+  //! assuming direct-mapped is writeback
+  update_stats(cache->stats,(line != NULL),true,false,action); // update stats
+  if (line == NULL){
+      // miss
+    sets_for_index[0].tag = tag; // if missed, set the tag to bring the thing into cache
+  }
+  return (line != NULL); // cache hit should return true
 }
