@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/irisli0926/Documents/GitHub/34105-p5",
+      "program": "/Users/irisli0926/Documents/GitHub/34105-p5/build/Debug/outDebug"
+    }
+  ]
+}
