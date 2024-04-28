@@ -17,11 +17,11 @@ cache_t *make_cache(int capacity, int block_size, int assoc, enum protocol_t pro
   // FIX THIS CODE!
   // first, correctly set these 5 variables. THEY ARE ALL WRONG
   // note: you may find math.h's log2 function useful
-  cache->n_cache_line = 1;
-  cache->n_set = 1;
-  cache->n_offset_bit = 1;
-  cache->n_index_bit = 1;
-  cache->n_tag_bit = 1;
+  cache->n_cache_line = capacity / block_size;
+  cache->n_set = capacity / (block_size * assoc);
+  cache->n_offset_bit = log2(block_size);
+  cache->n_index_bit = log2(cache->n_set);
+  cache->n_tag_bit = 32 - cache->n_index_bit - cache->n_offset_bit;
 
   // next create the cache lines and the array of LRU bits
   // - malloc an array with n_rows
