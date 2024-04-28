@@ -63,9 +63,9 @@ cache_t *make_cache(int capacity, int block_size, int assoc, enum protocol_t pro
  */
 unsigned long get_cache_tag(cache_t *cache, unsigned long addr) {
   // FIX THIS CODE!
-  int n_tag_bit = cache->n_tag_bit;
-  unsigned long tag_mask = n_tag_bit << cache->n_index_bit + cache->n_offset_bit;
-  return addr & tag_mask;
+  unsigned long tag_mask = (1 << cache->n_tag_bit) - 1;
+  addr = addr >> (cache->n_index_bit + cache->n_offset_bit);
+  return (addr & tag_mask);
 }
 
 /* Given a configured cache, returns the index portion of the given address.
@@ -78,7 +78,7 @@ unsigned long get_cache_index(cache_t *cache, unsigned long addr) {
   // FIX THIS CODE!
   unsigned long index_mask = 1 << cache->n_index_bit;
   index_mask -= 1; // result is n_index_bit set bits
-  index_mask = index_mask << cache->n_offset_bit;
+  addr = addr >> cache->n_offset_bit;
 
   return addr & index_mask;
 }
