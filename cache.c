@@ -65,7 +65,11 @@ unsigned long get_cache_tag(cache_t *cache, unsigned long addr) {
  */
 unsigned long get_cache_index(cache_t *cache, unsigned long addr) {
   // FIX THIS CODE!
-  return 0;
+  unsigned long index_mask = 1 << cache->n_index_bit;
+  index_mask -= 1; // result is n_index_bit set bits
+  index_mask = index_mask << cache->n_offset_bit;
+
+  return addr & index_mask;
 }
 
 /* Given a configured cache, returns the given address with the offset bits zeroed out.

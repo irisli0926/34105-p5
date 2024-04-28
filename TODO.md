@@ -1,8 +1,8 @@
 - [ ] paper practice (optional)
 - [ ] ``make_cache``
-- [ ] ``get_cache_tag``
-- [ ] ``get_cache_index``
-- [ ] ``get_cache_block_addr``
+- [ ] ``get_cache_tag`` (emily)
+- [ ] ``get_cache_index`` (helen)
+- [ ] ``get_cache_block_addr`` (iris)
 - [ ] ``access_cache`` (step-by-step)
 - [ ] cache types
   - [ ] direct-mapped
