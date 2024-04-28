@@ -6,10 +6,23 @@
 - [ ] ``access_cache`` (step-by-step)
 - [ ] cache types
   - [ ] direct-mapped
-  - [ ] task 5: set associative
+  - [ ] task 5: set associative: add set associativity
   - [ ] task 6: writeback memory traffic
+    - [ ] add stats ``B_bus_to_cache, B_cache_to_bus_wb, B_total_traffic_wb``
   - [ ] task 7: writethrough statistics
+    - [ ] add stats ``B_cache_to_bus_wt, B_total_traffic_wt.``
 - [ ] multicore
   - [ ] task 8: multicore, no coherence protocol
+    - [ ] add stats ``n_bus_snoops``, ``n_snoop_hits``
   - [ ] task 9: vi protocol
   - [ ] task 10: msi protocol
+
+
+- experiments:
+  - 1A: cache size vs. miss rate
+  - 1B: cache size vs. miss rate with greater associativity
+  - 2: cache associativity vs. bus traffic
+  - 3: traffic vs. block size
+  - 4A: miss rate vs. block size
+  - 4B: miss rate vs. block size for multicore
+  - 
