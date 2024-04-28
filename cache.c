@@ -76,7 +76,10 @@ unsigned long get_cache_index(cache_t *cache, unsigned long addr) {
  */
 unsigned long get_cache_block_addr(cache_t *cache, unsigned long addr) {
   // FIX THIS CODE!
-  return 0;
+  unsigned long offset_mask = (1 << cache->n_offset_bit) - 1;
+  unsigned long block_addr = addr & ~offset_mask;
+  
+  return block_addr;
 }
 
 
