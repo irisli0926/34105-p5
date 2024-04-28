@@ -28,14 +28,23 @@ cache_t *make_cache(int capacity, int block_size, int assoc, enum protocol_t pro
   // - for each element in the array, malloc another array with n_col
   // FIX THIS CODE!
 
-  cache->lines = NULL;
-  cache->lru_way = NULL;
+  cache->lines = malloc(cache->n_set * sizeof(cache_line_t*));
+  for (int i = 0; i < cache->n_set; i++) {
+    cache->lines[i] = malloc(cache->assoc * sizeof(cache_line_t));
+  }
+  cache->lru_way = malloc(cache->n_set * sizeof(int));
+  for (int i = 0; i < cache->n_set; i++) {
+    cache->lru_way[i] = 0;
+  }
 
   // initializes cache tags to 0, dirty bits to false,
   // state to INVALID, and LRU bits to 0
   // FIX THIS CODE!
   for (int i = 0; i < 1; i++) {
     for (int j = 0; j < 1; j++) {
+      cache->lines[i][j].tag = 0;
+      cache->lines[i][j].dirty_f = false;
+      cache->lines[i][j].state = INVALID;
       // body goes here
     }
   }
@@ -65,7 +74,11 @@ unsigned long get_cache_tag(cache_t *cache, unsigned long addr) {
  */
 unsigned long get_cache_index(cache_t *cache, unsigned long addr) {
   // FIX THIS CODE!
-  return 0;
+  unsigned long index_mask = 1 << cache->n_index_bit;
+  index_mask -= 1; // result is n_index_bit set bits
+  index_mask = index_mask << cache->n_offset_bit;
+
+  return addr & index_mask;
 }
 
 /* Given a configured cache, returns the given address with the offset bits zeroed out.
