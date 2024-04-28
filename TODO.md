@@ -1,0 +1,15 @@
+- [ ] paper practice (optional)
+- [ ] ``make_cache``
+- [ ] ``get_cache_tag``
+- [ ] ``get_cache_index``
+- [ ] ``get_cache_block_addr``
+- [ ] ``access_cache`` (step-by-step)
+- [ ] cache types
+  - [ ] direct-mapped
+  - [ ] task 5: set associative
+  - [ ] task 6: writeback memory traffic
+  - [ ] task 7: writethrough statistics
+- [ ] multicore
+  - [ ] task 8: multicore, no coherence protocol
+  - [ ] task 9: vi protocol
+  - [ ] task 10: msi protocol
