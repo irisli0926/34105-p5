@@ -132,3 +132,89 @@ bool access_cache(cache_t *cache, unsigned long addr, enum action_t action) {
   }
   return (line != NULL); // cache hit should return true
 }
+
+
+
+//helper 1: handle no coherence protocol
+void handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum action_t action) {
+  bool hit = access_cache(cache, addr, action);
+  if (hit) {
+    // Cache hit
+    if (action == LOAD) {
+      // Perform load operation
+      // ...
+    } else if (action == STORE) {
+      // Perform store operation
+      // ...
+    }
+  } else {
+    // Cache miss
+    if (action == LOAD) {
+      // Perform load operation
+      // ...
+    } else if (action == STORE) {
+      // Perform store operation
+      // ...
+    }
+  }
+}
+
+//helper 2: handle VI protocol
+void handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action) {
+  bool hit = access_cache(cache, addr, action);
+  if (hit) {
+    // Cache hit
+    if (action == LOAD) {
+      // Perform load operation
+      // ...
+    } else if (action == STORE) {
+      // Perform store operation
+      // ...
+    }
+  } else {
+    // Cache miss
+    if (action == LOAD) {
+      // Perform load operation
+      // ...
+    } else if (action == STORE) {
+      // Perform store operation
+      // ...
+    }
+  }
+}
+
+//helper 3: handle MSI protocol
+void handle_msi_protocol(cache_t *cache, unsigned long addr, enum action_t action) {
+  bool hit = access_cache(cache, addr, action);
+  if (hit) {
+    // Cache hit
+    if (action == LOAD) {
+      // Perform load operation
+      // ...
+    } else if (action == STORE) {
+      // Perform store operation
+      // ...
+    } else if (action == LD_MISS) {
+      // Perform load miss operation
+      // ...
+    } else if (action == ST_MISS) {
+      // Perform store miss operation
+      // ...
+    }
+  } else {
+    // Cache miss
+    if (action == LOAD) {
+      // Perform load operation
+      // ...
+    } else if (action == STORE) {
+      // Perform store operation
+      // ...
+    } else if (action == LD_MISS) {
+      // Perform load miss operation
+      // ...
+    } else if (action == ST_MISS) {
+      // Perform store miss operation
+      // ...
+    }
+  }
+}
