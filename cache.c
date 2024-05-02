@@ -122,7 +122,9 @@ bool handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum actio
   if (hit) {
     // Cache hit
     // Update LRU since hit
-    cache->lru_way[index] = (way + 1) % cache->assoc;
+    if (action == STORE || action == LOAD){
+      cache->lru_way[index] = (way + 1) % cache->assoc;
+    }
     
 
     if (action == STORE) {
@@ -150,10 +152,12 @@ bool handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum actio
     update_stats(cache->stats, false, writeback_f, false, action);
 
     // Update LRU_way, cacheTags, state, dirty flags
-    line->tag = tag;
-    line->state = VALID; //! changed from being marked invalid to start, by bringing something into cache it's necessarily valid
-    //! removed line->dirty_f = false: clears the dirty setting above
-    cache->lru_way[index] = (way + 1) % cache->assoc;
+    if (action == LOAD || action == STORE){
+      line->tag = tag;
+      line->state = VALID; //! changed from being marked invalid to start, by bringing something into cache it's necessarily valid
+      //! removed line->dirty_f = false: clears the dirty setting above
+      cache->lru_way[index] = (way + 1) % cache->assoc;
+    }
   }
 
   return hit;
@@ -186,7 +190,7 @@ bool handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action
     // Get a pointer to the cache line for the current cache index and way
     cache_line_t *line = &cache->lines[index][way];
     if (action == LOAD) {
-      line->state = VALID;
+      //line->state = VALID;
       cache->lru_way[index] = (way + 1) % cache->assoc;
     } else if (action == STORE) {
       line->dirty_f = true;

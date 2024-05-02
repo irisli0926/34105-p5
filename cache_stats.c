@@ -39,19 +39,22 @@ cache_stats_t *make_cache_stats() {
  * also need to update total_snoop_hits, total_bus_snoops
 */
 void update_stats(cache_stats_t *stats, bool hit_f, bool writeback_f, bool upgrade_miss_f, enum action_t action) {
-  if (hit_f)
-    stats->n_hits++;
   
   if (action == STORE)
     stats->n_stores++;
 
-  if (writeback_f)
-    stats->n_writebacks++;
   
   if (upgrade_miss_f)
     stats->n_upgrade_miss++;
-
-  stats->n_cpu_accesses++;
+  
+  if (action == STORE || action == LOAD){
+    //! fixes access counts and hit/miss counts during multicore
+    stats->n_cpu_accesses++;
+    if (hit_f)
+      stats->n_hits++;
+    if (writeback_f)
+    stats->n_writebacks++;
+  }
 }
 
 // could do this in the previous method, but that's a lot of extra divides...
