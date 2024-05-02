@@ -117,24 +117,26 @@ bool handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum actio
   log_way(way);
   log_set(index);
 
+  cache_line_t *line = &cache->lines[index][way];
+  hit = hit && (line->state == VALID); // hit status
   if (hit) {
     // Cache hit
     // Update LRU since hit
     cache->lru_way[index] = (way + 1) % cache->assoc;
-    cache_line_t *line = &cache->lines[index][way];
+    
 
     if (action == STORE) {
       line->dirty_f = true;
-      writeback_f = line->dirty_f;
+      //! removed writeback_f = line->dirty_f: writebacks only happen on eviction (unless writethrough), it seems like we're implementing a writeback cache
     }
-    if (action == LOAD) {
-      line->dirty_f = false;
-      line->state = VALID;
-    }
+    /*
+      ! removed actions on load:
+      line->dirty_f = false risks clearing the dirty bit if the same line was written to before
+      line->state = VALID is kind of redundant, too
+    */
     update_stats(cache->stats, true, writeback_f, false, action);
   } else {
     // Cache miss
-    cache_line_t *line = &cache->lines[index][way];
 
     // Assume writeback if dirty
     writeback_f = line->dirty_f;
@@ -142,14 +144,15 @@ bool handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum actio
     if (action == LOAD) {
       line->dirty_f = false;
     } else if (action == STORE) {
+      //! the below is maybe redundant? idk the result seems to be same with / without
       line->dirty_f = true;
     }
     update_stats(cache->stats, false, writeback_f, false, action);
 
     // Update LRU_way, cacheTags, state, dirty flags
     line->tag = tag;
-    line->state = INVALID;
-    line->dirty_f = false;
+    line->state = VALID; //! changed from being marked invalid to start, by bringing something into cache it's necessarily valid
+    //! removed line->dirty_f = false: clears the dirty setting above
     cache->lru_way[index] = (way + 1) % cache->assoc;
   }
 

@@ -1,11 +1,12 @@
 - [ ] paper practice (optional)
-- [ ] ``make_cache``
-- [ ] ``get_cache_tag`` (emily)
-- [ ] ``get_cache_index`` (helen)
-- [ ] ``get_cache_block_addr`` (iris)
+- [x] ``make_cache``
+- [x] ``get_cache_tag`` (emily)
+- [x] ``get_cache_index`` (helen)
+- [x] ``get_cache_block_addr`` (iris)
 - [ ] ``access_cache`` (step-by-step)
 - [ ] cache types
   - [ ] direct-mapped
+    - [ ] gather data
   - [ ] task 5: set associative: add set associativity
   - [ ] task 6: writeback memory traffic
     - [ ] add stats ``B_bus_to_cache, B_cache_to_bus_wb, B_total_traffic_wb``
@@ -19,10 +20,10 @@
 
 
 - experiments:
-  - 1A: cache size vs. miss rate
-  - 1B: cache size vs. miss rate with greater associativity
-  - 2: cache associativity vs. bus traffic
-  - 3: traffic vs. block size
+  - 1A (emily): cache size vs. miss rate
+  - 1B (emily): cache size vs. miss rate with greater associativity
+  - 2 (helen): cache associativity vs. bus traffic
+  - 3 (helen): traffic vs. block size
   - 4A: miss rate vs. block size
   - 4B: miss rate vs. block size for multicore
-  - 
+  - 5
