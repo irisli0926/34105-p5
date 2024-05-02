@@ -98,6 +98,223 @@ unsigned long get_cache_block_addr(cache_t *cache, unsigned long addr) {
 }
 
 
+//helper 1: handle no coherence protocol
+bool handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum action_t action) {
+  unsigned long index = get_cache_index(cache, addr);
+  unsigned long tag = get_cache_tag(cache, addr);
+  int way = cache->lru_way[index];
+  bool hit = false;
+  bool writeback_f = false;
+
+  // Search for the address in the cache
+  for (int i = 0; i < cache->assoc; i++) {
+    if (cache->lines[index][i].tag == tag) {
+      hit = true;
+      way = i;
+      break;
+    }
+  }
+  log_way(way);
+  log_set(index);
+
+  if (hit) {
+    // Cache hit
+    // Update LRU since hit
+    cache->lru_way[index] = (way + 1) % cache->assoc;
+    cache_line_t *line = &cache->lines[index][way];
+
+    if (action == STORE) {
+      line->dirty_f = true;
+      writeback_f = line->dirty_f;
+    }
+    if (action == LOAD) {
+      line->dirty_f = false;
+      line->state = VALID;
+    }
+    update_stats(cache->stats, true, writeback_f, false, action);
+  } else {
+    // Cache miss
+    cache_line_t *line = &cache->lines[index][way];
+
+    // Assume writeback if dirty
+    writeback_f = line->dirty_f;
+
+    if (action == LOAD) {
+      line->dirty_f = false;
+    } else if (action == STORE) {
+      line->dirty_f = true;
+    }
+    update_stats(cache->stats, false, writeback_f, false, action);
+
+    // Update LRU_way, cacheTags, state, dirty flags
+    line->tag = tag;
+    line->state = INVALID;
+    line->dirty_f = false;
+    cache->lru_way[index] = (way + 1) % cache->assoc;
+  }
+
+  return hit;
+}
+
+//helper 2: handle VI protocol
+bool handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action) {
+  unsigned long index = get_cache_index(cache, addr);
+  unsigned long tag = get_cache_tag(cache, addr);
+  int way = cache->lru_way[index];
+  bool hit = false;
+  bool writeback_f = false;
+
+
+  // Search for the address in the cache
+  for (int i = 0; i < cache->assoc; i++) {
+    if (cache->lines[index][i].tag == tag) {
+      hit = true;
+      way = i;
+      break;
+    }
+  }
+
+  log_way(way);
+  log_set(index);
+  if (hit) {
+    // Cache hit
+
+    // Update the LRU way for the current cache index
+    // Get a pointer to the cache line for the current cache index and way
+    cache_line_t *line = &cache->lines[index][way];
+    if (action == LOAD) {
+      line->state = VALID;
+      cache->lru_way[index] = (way + 1) % cache->assoc;
+    } else if (action == STORE) {
+      line->dirty_f = true;
+      cache->lru_way[index] = (way + 1) % cache->assoc;
+    } else {
+      // Cache miss
+      // check if dirty
+      bool dirty = line->dirty_f;
+      if (!dirty) {
+        line->state = INVALID;
+      } else  {
+        // Writeback
+        writeback_f = true;
+        line->dirty_f = false;
+      }
+    }
+    update_stats(cache->stats, hit, writeback_f, false, action);
+  } else {
+    // Cache miss
+    cache_line_t *line = &cache->lines[index][way];
+    writeback_f = line->dirty_f;
+    if (action == LOAD) {
+      line->state = VALID;
+      line->tag = tag;
+      cache->lru_way[index] = (way + 1) % cache->assoc;
+    } else if (action == STORE) {
+      line->state = VALID;
+      line->tag = tag;
+      line->dirty_f = true;
+      cache->lru_way[index] = (way + 1) % cache->assoc;
+    } else {
+      // check if dirty
+      bool dirty = line->dirty_f;
+      if (!dirty) {
+        line->state = INVALID;
+      } else {
+        // Writeback
+        writeback_f = true;
+        line->dirty_f = false;
+      }
+    }
+    update_stats(cache->stats, hit, writeback_f, false, action);
+  }
+  return hit;
+
+}
+
+//helper 3: handle MSI protocol
+bool handle_msi_protocol(cache_t *cache, unsigned long addr, enum action_t action) {
+  unsigned long index = get_cache_index(cache, addr);
+  unsigned long tag = get_cache_tag(cache, addr);
+  int way = cache->lru_way[index];
+  bool hit = false;
+  bool writeback_f = false;
+
+  bool upgrade_miss = false;
+
+  // Search for the address in the cache
+  for (int i = 0; i < cache->assoc; i++) {
+    if (cache->lines[index][i].tag == tag) {
+      hit = true;
+      way = i;
+      break;
+    }
+  }
+
+  log_way(way);
+  log_set(index);
+
+  if (hit) {
+    // Cache hit
+    cache_line_t *line = &cache->lines[index][way];
+    if (action == LOAD) {
+      if (line->state == MODIFIED || line->state == SHARED) {
+        line->state = SHARED;
+      }
+      cache->lru_way[index] = (way + 1) % cache->assoc;
+    } else if (action == STORE) {
+      if (line->state == MODIFIED || line->state == SHARED) {
+        line->state = MODIFIED;
+        //upgrade miss
+        hit = false;
+        upgrade_miss = true;
+      }
+    } else if (action == ST_MISS) {
+      // Cache miss
+      bool dirty = (line->state == MODIFIED);
+      if (dirty) {
+        writeback_f = true;
+        line->state = INVALID;
+      }
+    } else if (action == LD_MISS) {
+      // Cache miss
+      bool dirty = line->state == MODIFIED;
+      if (dirty) {
+        writeback_f = true;
+        line->state = SHARED;
+      }
+    }
+    update_stats(cache->stats, hit, writeback_f, upgrade_miss, action);
+  }
+  else {
+    // Cache miss
+    cache_line_t *line = &cache->lines[index][way];
+    writeback_f = (line->state == MODIFIED);
+    bool dirty = line->state == MODIFIED;
+
+    if (action == LOAD) {
+      if (dirty) {
+        writeback_f = true;
+      }
+      line->state = SHARED;
+      line->tag = tag;
+      cache->lru_way[index] = (way + 1) % cache->assoc;
+    } else if (action == STORE) {
+      if (dirty) {
+        writeback_f = true;
+      }
+      line->state = MODIFIED;
+      line->tag = tag;
+      cache->lru_way[index] = (way + 1) % cache->assoc;
+    } else {
+      line->state = INVALID;
+    }
+    update_stats(cache->stats, hit, writeback_f, false, action);
+  }
+  return hit;
+}
+
+
+
 /* this method takes a cache, an address, and an action
  * it proceses the cache access. functionality in no particular order: 
  *   - look up the address in the cache, determine if hit or miss
@@ -108,113 +325,35 @@ unsigned long get_cache_block_addr(cache_t *cache, unsigned long addr) {
  */
 bool access_cache(cache_t *cache, unsigned long addr, enum action_t action) {
   // FIX THIS CODE!
-  unsigned long index = get_cache_index(cache, addr);
-  unsigned long tag = get_cache_tag(cache, addr);
+  // unsigned long index = get_cache_index(cache, addr);
+  // unsigned long tag = get_cache_tag(cache, addr);
 
-  // get array of lines to search
-  cache_line_t *sets_for_index = cache->lines[index];
-  cache_line_t *line = NULL; // indicator: if still null after search, address not found
+  // // get array of lines to search
+  // cache_line_t *sets_for_index = cache->lines[index];
+  // cache_line_t *line = NULL; // indicator: if still null after search, address not found
 
-  // for every way in the cache:
-  for (int way_no = 0; way_no < cache->assoc; way_no++){
-    // if a way has a tag, set the indicator
-    if (sets_for_index[way_no].tag == tag){
-      line = &sets_for_index[way_no];
-    }
-  }
-  // if line is still null, nothing found
+  // // for every way in the cache:
+  // for (int way_no = 0; way_no < cache->assoc; way_no++){
+  //   // if a way has a tag, set the indicator
+  //   if (sets_for_index[way_no].tag == tag){
+  //     line = &sets_for_index[way_no];
+  //   }
+  // }
+  // // if line is still null, nothing found
 
-  //! assuming direct-mapped is writeback
-  update_stats(cache->stats,(line != NULL),true,false,action); // update stats
-  if (line == NULL){
-      // miss
-    sets_for_index[0].tag = tag; // if missed, set the tag to bring the thing into cache
-  }
-  return (line != NULL); // cache hit should return true
-}
-
-
-
-//helper 1: handle no coherence protocol
-void handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum action_t action) {
-  bool hit = access_cache(cache, addr, action);
-  if (hit) {
-    // Cache hit
-    if (action == LOAD) {
-      // Perform load operation
-      // ...
-    } else if (action == STORE) {
-      // Perform store operation
-      // ...
-    }
-  } else {
-    // Cache miss
-    if (action == LOAD) {
-      // Perform load operation
-      // ...
-    } else if (action == STORE) {
-      // Perform store operation
-      // ...
-    }
+  // //! assuming direct-mapped is writeback
+  // update_stats(cache->stats,(line != NULL),true,false,action); // update stats
+  // if (line == NULL){
+  //     // miss
+  //   sets_for_index[0].tag = tag; // if missed, set the tag to bring the thing into cache
+  // }
+  // return (line != NULL); // cache hit should return true
+  if (cache->protocol == NONE) {
+    return handle_no_coherence_protocol(cache, addr, action);
+  } else if (cache->protocol == VI) {
+    return handle_vi_protocol(cache, addr, action);
+  } else if (cache->protocol == MSI) {
+    return handle_msi_protocol(cache, addr, action);
   }
 }
 
-//helper 2: handle VI protocol
-void handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action) {
-  bool hit = access_cache(cache, addr, action);
-  if (hit) {
-    // Cache hit
-    if (action == LOAD) {
-      // Perform load operation
-      // ...
-    } else if (action == STORE) {
-      // Perform store operation
-      // ...
-    }
-  } else {
-    // Cache miss
-    if (action == LOAD) {
-      // Perform load operation
-      // ...
-    } else if (action == STORE) {
-      // Perform store operation
-      // ...
-    }
-  }
-}
-
-//helper 3: handle MSI protocol
-void handle_msi_protocol(cache_t *cache, unsigned long addr, enum action_t action) {
-  bool hit = access_cache(cache, addr, action);
-  if (hit) {
-    // Cache hit
-    if (action == LOAD) {
-      // Perform load operation
-      // ...
-    } else if (action == STORE) {
-      // Perform store operation
-      // ...
-    } else if (action == LD_MISS) {
-      // Perform load miss operation
-      // ...
-    } else if (action == ST_MISS) {
-      // Perform store miss operation
-      // ...
-    }
-  } else {
-    // Cache miss
-    if (action == LOAD) {
-      // Perform load operation
-      // ...
-    } else if (action == STORE) {
-      // Perform store operation
-      // ...
-    } else if (action == LD_MISS) {
-      // Perform load miss operation
-      // ...
-    } else if (action == ST_MISS) {
-      // Perform store miss operation
-      // ...
-    }
-  }
-}
