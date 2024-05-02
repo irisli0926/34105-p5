@@ -129,13 +129,8 @@ bool handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum actio
 
     if (action == STORE) {
       line->dirty_f = true;
-      //! removed writeback_f = line->dirty_f: writebacks only happen on eviction (unless writethrough), it seems like we're implementing a writeback cache
     }
-    /*
-      ! removed actions on load:
-      line->dirty_f = false risks clearing the dirty bit if the same line was written to before
-      line->state = VALID is kind of redundant, too
-    */
+
     update_stats(cache->stats, true, writeback_f, false, action);
   } else {
     // Cache miss
@@ -146,7 +141,6 @@ bool handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum actio
     if (action == LOAD) {
       line->dirty_f = false;
     } else if (action == STORE) {
-      //! the below is maybe redundant? idk the result seems to be same with / without
       line->dirty_f = true;
     }
     update_stats(cache->stats, false, writeback_f, false, action);
@@ -154,8 +148,7 @@ bool handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum actio
     // Update LRU_way, cacheTags, state, dirty flags
     if (action == LOAD || action == STORE){
       line->tag = tag;
-      line->state = VALID; //! changed from being marked invalid to start, by bringing something into cache it's necessarily valid
-      //! removed line->dirty_f = false: clears the dirty setting above
+      line->state = VALID; 
       cache->lru_way[index] = (way + 1) % cache->assoc;
     }
   }
@@ -331,30 +324,6 @@ bool handle_msi_protocol(cache_t *cache, unsigned long addr, enum action_t actio
  * Use the "get" helper functions above. They make your life easier.
  */
 bool access_cache(cache_t *cache, unsigned long addr, enum action_t action) {
-  // FIX THIS CODE!
-  // unsigned long index = get_cache_index(cache, addr);
-  // unsigned long tag = get_cache_tag(cache, addr);
-
-  // // get array of lines to search
-  // cache_line_t *sets_for_index = cache->lines[index];
-  // cache_line_t *line = NULL; // indicator: if still null after search, address not found
-
-  // // for every way in the cache:
-  // for (int way_no = 0; way_no < cache->assoc; way_no++){
-  //   // if a way has a tag, set the indicator
-  //   if (sets_for_index[way_no].tag == tag){
-  //     line = &sets_for_index[way_no];
-  //   }
-  // }
-  // // if line is still null, nothing found
-
-  // //! assuming direct-mapped is writeback
-  // update_stats(cache->stats,(line != NULL),true,false,action); // update stats
-  // if (line == NULL){
-  //     // miss
-  //   sets_for_index[0].tag = tag; // if missed, set the tag to bring the thing into cache
-  // }
-  // return (line != NULL); // cache hit should return true
   if (cache->protocol == NONE) {
     return handle_no_coherence_protocol(cache, addr, action);
   } else if (cache->protocol == VI) {
