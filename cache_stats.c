@@ -55,6 +55,13 @@ void update_stats(cache_stats_t *stats, bool hit_f, bool writeback_f, bool upgra
     if (writeback_f)
     stats->n_writebacks++;
   }
+
+  if (action == 'ST_MISS' || action == 'LD_MISS'){
+    stats->n_bus_snoops++;
+    if (hit_f)
+      stats->n_snoop_hits++;
+  }
+    
 }
 
 // could do this in the previous method, but that's a lot of extra divides...
