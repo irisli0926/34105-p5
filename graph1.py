@@ -62,4 +62,6 @@ def graph():
     plt.savefig(figname)
     plt.show()
 
+    print(plt.ginput())
+
 graph()

@@ -164,15 +164,21 @@ bool handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action
   bool hit = false;
   bool writeback_f = false;
 
+  
 
   // Search for the address in the cache
   for (int i = 0; i < cache->assoc; i++) {
     if (cache->lines[index][i].tag == tag) {
-      hit = true;
-      way = i;
-      break;
+      if (cache->lines[index][i].state == VALID){
+          hit = true;
+          way = i;
+          break;
+      }
+      
     }
   }
+
+  cache_line_t *line = &cache->lines[index][way];
 
   log_way(way);
   log_set(index);
@@ -181,9 +187,7 @@ bool handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action
 
     // Update the LRU way for the current cache index
     // Get a pointer to the cache line for the current cache index and way
-    cache_line_t *line = &cache->lines[index][way];
     if (action == LOAD) {
-      //line->state = VALID;
       cache->lru_way[index] = (way + 1) % cache->assoc;
     } else if (action == STORE) {
       line->dirty_f = true;
@@ -192,15 +196,17 @@ bool handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action
       // Cache miss
       // check if dirty
       bool dirty = line->dirty_f;
-      if (!dirty) {
-        line->state = INVALID;
-      } else  {
+      line->state = INVALID;
+      hit = false;
+      if (dirty) {
         // Writeback
         writeback_f = true;
         line->dirty_f = false;
       }
     }
+
     update_stats(cache->stats, hit, writeback_f, false, action);
+  
   } else {
     // Cache miss
     cache_line_t *line = &cache->lines[index][way];
