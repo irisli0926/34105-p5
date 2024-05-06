@@ -249,9 +249,11 @@ bool handle_msi_protocol(cache_t *cache, unsigned long addr, enum action_t actio
   // Search for the address in the cache
   for (int i = 0; i < cache->assoc; i++) {
     if (cache->lines[index][i].tag == tag) {
-      hit = true;
-      way = i;
-      break;
+      if (cache->lines[index][i].state != INVALID){
+          hit = true;
+          way = i;
+          break;
+      }
     }
   }
 
