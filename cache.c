@@ -267,7 +267,8 @@ bool handle_msi_protocol(cache_t *cache, unsigned long addr, enum action_t actio
       }
       cache->lru_way[index] = (way + 1) % cache->assoc;
     } else if (action == STORE) {
-      if (line->state == MODIFIED || line->state == SHARED) {
+      if (line->state == SHARED) {
+      // if (line->state == MODIFIED || line->state == SHARED) {
         line->state = MODIFIED;
         //upgrade miss
         hit = false;
@@ -297,6 +298,8 @@ bool handle_msi_protocol(cache_t *cache, unsigned long addr, enum action_t actio
     bool dirty = line->state == MODIFIED;
 
     if (action == LOAD) {
+      int way = cache->lru_way[index];
+
       if (dirty) {
         writeback_f = true;
       }
@@ -304,15 +307,18 @@ bool handle_msi_protocol(cache_t *cache, unsigned long addr, enum action_t actio
       line->tag = tag;
       cache->lru_way[index] = (way + 1) % cache->assoc;
     } else if (action == STORE) {
+      int way = cache->lru_way[index];
       if (dirty) {
         writeback_f = true;
       }
       line->state = MODIFIED;
       line->tag = tag;
       cache->lru_way[index] = (way + 1) % cache->assoc;
-    } else {
-      line->state = INVALID;
-    }
+    } 
+    // else {
+      
+      // line->state = INVALID;
+    // }
     update_stats(cache->stats, hit, writeback_f, false, action);
   }
   return hit;
