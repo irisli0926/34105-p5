@@ -40,12 +40,11 @@ cache_t *make_cache(int capacity, int block_size, int assoc, enum protocol_t pro
   // initializes cache tags to 0, dirty bits to false,
   // state to INVALID, and LRU bits to 0
   // FIX THIS CODE!
-  for (int i = 0; i < 1; i++) {
-    for (int j = 0; j < 1; j++) {
+ for (int i = 0; i < cache->n_set; i++) {
+    for (int j = 0; j < cache->assoc; j++) {
       cache->lines[i][j].tag = 0;
       cache->lines[i][j].dirty_f = false;
       cache->lines[i][j].state = INVALID;
-      // body goes here
     }
   }
 
