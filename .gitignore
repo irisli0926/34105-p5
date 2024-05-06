@@ -1,2 +1,5 @@
 *.o
 p5
+.vscode/
+p5.dSYM/
+results/
