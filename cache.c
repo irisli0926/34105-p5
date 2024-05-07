@@ -6,7 +6,7 @@
 #include "cache.h"
 #include "print_helpers.h"
 
-cache_t *make_cache(int capacity, int block_size, int assoc, enum protocol_t protocol, bool lru_on_invalidate_f){
+cache_t *make_cache(int capacity, int block_size, int assoc, enum protocol_t protocol, bool lru_on_invalidate_f) {
   cache_t *cache = malloc(sizeof(cache_t));
   cache->stats = make_cache_stats();
   
@@ -28,11 +28,19 @@ cache_t *make_cache(int capacity, int block_size, int assoc, enum protocol_t pro
   // - for each element in the array, malloc another array with n_col
   // FIX THIS CODE!
 
+  // allocate lines: number of lines / sets times the size of the container for each line
+  // the container is a pointer to cache_line_t, as each line points to an array representing the 'ways'
   cache->lines = malloc(cache->n_set * sizeof(cache_line_t*));
+
+  // then, for each set, allocate the way(s) associated with it
   for (int i = 0; i < cache->n_set; i++) {
-    cache->lines[i] = malloc(cache->assoc * sizeof(cache_line_t));
+    cache->lines[i] = malloc(cache->assoc * sizeof(cache_line_t)); // assoc represents the number of ways, cache_line_t is the actual line
   }
+
+  // create an array of lru counters: each set needs its own lru counter, which is just an int
   cache->lru_way = malloc(cache->n_set * sizeof(int));
+
+  // then, clear each way's lru counter manually: could use calloc but ah well
   for (int i = 0; i < cache->n_set; i++) {
     cache->lru_way[i] = 0;
   }
@@ -40,8 +48,12 @@ cache_t *make_cache(int capacity, int block_size, int assoc, enum protocol_t pro
   // initializes cache tags to 0, dirty bits to false,
   // state to INVALID, and LRU bits to 0
   // FIX THIS CODE!
- for (int i = 0; i < cache->n_set; i++) {
+
+  // for every set,
+  for (int i = 0; i < cache->n_set; i++) {
+    // for every way in the set,
     for (int j = 0; j < cache->assoc; j++) {
+      // clear tag, set dirty bits, and reset the state
       cache->lines[i][j].tag = 0;
       cache->lines[i][j].dirty_f = false;
       cache->lines[i][j].state = INVALID;
@@ -61,10 +73,13 @@ cache_t *make_cache(int capacity, int block_size, int assoc, enum protocol_t pro
  * in decimal -- get_cache_tag(3921) returns 15 
  */
 unsigned long get_cache_tag(cache_t *cache, unsigned long addr) {
-  // FIX THIS CODE!
-  unsigned long tag_mask = (1 << cache->n_tag_bit) - 1;
-  addr = addr >> (cache->n_index_bit + cache->n_offset_bit);
-  return (addr & tag_mask);
+  unsigned long tag_mask = (1 << cache->n_tag_bit) - 1; // produces n_tag_bit ones
+
+  // shift the stuff which isn't index or offset (necessarily the tag) into the LSBs
+  addr = addr >> (cache->n_index_bit + cache->n_offset_bit); 
+
+
+  return (addr & tag_mask); // and with tag_mask to obtain the n_tag_bit bits corresponding to the tag
 }
 
 /* Given a configured cache, returns the index portion of the given address.
@@ -74,12 +89,12 @@ unsigned long get_cache_tag(cache_t *cache, unsigned long addr) {
  * in decimal -- get_cache_index(3921) returns 5
  */
 unsigned long get_cache_index(cache_t *cache, unsigned long addr) {
-  // FIX THIS CODE!
-  unsigned long index_mask = 1 << cache->n_index_bit;
+  unsigned long index_mask = 1 << cache->n_index_bit; // shift 1 by n_index_bit bits
   index_mask -= 1; // result is n_index_bit set bits
-  addr = addr >> cache->n_offset_bit;
+  addr = addr >> cache->n_offset_bit; // shift the stuff which isn't offset into the LSBs
 
-  return addr & index_mask;
+  return addr & index_mask; // and with index_mask to obtain the n_index_bit bits corresponding to the index
+  // the tag is ignored since only the lower bits of index_mask are set, which will ignore the index.
 }
 
 /* Given a configured cache, returns the given address with the offset bits zeroed out.
@@ -89,63 +104,75 @@ unsigned long get_cache_index(cache_t *cache, unsigned long addr) {
  * in decimal -- get_cache_block_addr(3921) returns 3920
  */
 unsigned long get_cache_block_addr(cache_t *cache, unsigned long addr) {
-  // FIX THIS CODE!
-  unsigned long offset_mask = (1 << cache->n_offset_bit) - 1;
-  unsigned long block_addr = addr & ~offset_mask;
+  unsigned long offset_mask = (1 << cache->n_offset_bit) - 1; // this yields n_offset_bit ones
+
+  // inverting offset_mask yields ones in everything but the offset bits, and ANDing with addr clears the offset bits
+  unsigned long block_addr = addr & ~offset_mask; 
   
-  return block_addr;
+  return block_addr; // return the block address
 }
 
 
 //helper 1: handle no coherence protocol
 bool handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum action_t action) {
-  unsigned long index = get_cache_index(cache, addr);
-  unsigned long tag = get_cache_tag(cache, addr);
-  int way = cache->lru_way[index];
-  bool hit = false;
-  bool writeback_f = false;
+  unsigned long index = get_cache_index(cache, addr); // obtain target index
+  unsigned long tag = get_cache_tag(cache, addr); // obtain target tag
+  
+  int way = cache->lru_way[index]; // tracks which way our line is in. starts here to make lru updating easier. 
+  bool hit = false; // flag to indicate whether we got a hit
+  bool writeback_f = false; // flag to indicate whether to writeback
 
-  // Search for the address in the cache
+  // Search for the address in the cache: we already know the set, now search the ways:
   for (int i = 0; i < cache->assoc; i++) {
+    // if the line's tag matches,
     if (cache->lines[index][i].tag == tag) {
+      // set the hit flag, update the way, and exit the loop
       hit = true;
       way = i;
       break;
     }
   }
+
+  // get a pointer to the line we found for easier operations
+  cache_line_t *line = &cache->lines[index][way];
+  
+  // log the way and index
   log_way(way);
   log_set(index);
 
-  cache_line_t *line = &cache->lines[index][way];
-  hit = hit && (line->state == VALID); // hit status
+  // we only actually got a hit if the line was valid as well
+  hit = hit && (line->state == VALID); // update hit status
+
   if (hit) {
     // Cache hit
-    // Update LRU since hit
-    if (action == STORE || action == LOAD){
+    // Update LRU since hit, if the action is from an active core
+    if (action == STORE || action == LOAD) {
       cache->lru_way[index] = (way + 1) % cache->assoc;
     }
-    
 
+    // if the action was a store, update the dirty bit as well
     if (action == STORE) {
       line->dirty_f = true;
     }
-
+    // then, update the stats
     update_stats(cache->stats, true, writeback_f, false, action);
   } else {
     // Cache miss
 
-    // Assume writeback if dirty
+    // Requires writeback if dirty
     writeback_f = line->dirty_f;
 
     if (action == LOAD) {
-      line->dirty_f = false;
+      line->dirty_f = false; // clear dirty bit if loading: brought into cache, but not modified
     } else if (action == STORE) {
-      line->dirty_f = true;
+      line->dirty_f = true; // set dirty bit if storing: emulates bringing into cache and writing
     }
+    // do nothing to dirty bit on LD_MISS or ST_MISS
+
     update_stats(cache->stats, false, writeback_f, false, action);
 
-    // Update LRU_way, cacheTags, state, dirty flags
-    if (action == LOAD || action == STORE){
+    // On action from active core, update LRU_way, cacheTags, state, dirty flags
+    if (action == LOAD || action == STORE) {
       line->tag = tag;
       line->state = VALID; 
       cache->lru_way[index] = (way + 1) % cache->assoc;
@@ -157,18 +184,21 @@ bool handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum actio
 
 //helper 2: handle VI protocol
 bool handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action) {
-  unsigned long index = get_cache_index(cache, addr);
-  unsigned long tag = get_cache_tag(cache, addr);
-  int way = cache->lru_way[index];
-  bool hit = false;
-  bool writeback_f = false;
+  unsigned long index = get_cache_index(cache, addr); // obtain target index
+  unsigned long tag = get_cache_tag(cache, addr); // obtain target tag
+  
+  int way = cache->lru_way[index]; // tracks which way our line is in. starts here to make lru updating easier. 
+  bool hit = false; // flag to indicate whether we got a hit
+  bool writeback_f = false; // flag to indicate whether to writeback
 
   
 
   // Search for the address in the cache
   for (int i = 0; i < cache->assoc; i++) {
+    // if the tag matches and the line is valid,
     if (cache->lines[index][i].tag == tag) {
-      if (cache->lines[index][i].state == VALID){
+      if (cache->lines[index][i].state == VALID) {
+          // update the hit flag, set the way we found, and exit
           hit = true;
           way = i;
           break;
@@ -177,39 +207,46 @@ bool handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action
     }
   }
 
+  // get a pointer to the line we found for easier operations
   cache_line_t *line = &cache->lines[index][way];
 
+  // log the way and index
   log_way(way);
   log_set(index);
+  
   if (hit) {
     // Cache hit
 
+    // On load or store from active core,
     // Update the LRU way for the current cache index
-    // Get a pointer to the cache line for the current cache index and way
     if (action == LOAD) {
       cache->lru_way[index] = (way + 1) % cache->assoc;
     } else if (action == STORE) {
-      line->dirty_f = true;
+      line->dirty_f = true; // on store, additionally update dirty bit
       cache->lru_way[index] = (way + 1) % cache->assoc;
     } else {
-      // Cache miss
-      // check if dirty
-      bool dirty = line->dirty_f;
-      line->state = INVALID;
-      hit = false;
+      // LD_MISS or ST_MISS
+      //! potentially not required?
+      bool dirty = line->dirty_f; // check if dirty
+
+      line->state = INVALID; // invalidate 
+      hit = false; // set hit to false
+
+      // if the line was dirty,
       if (dirty) {
-        // Writeback
-        writeback_f = true;
-        line->dirty_f = false;
+        writeback_f = true; // require writeback
+        line->dirty_f = false; // after writeback, the line is no longer dirty
       }
     }
 
+    // then, update the stats
     update_stats(cache->stats, hit, writeback_f, false, action);
   
   } else {
     // Cache miss
-    cache_line_t *line = &cache->lines[index][way];
-    writeback_f = line->dirty_f;
+    writeback_f = line->dirty_f; // if dirty, requires writeback
+
+    // if active core operation, bring thing into cache and set LRU way.
     if (action == LOAD) {
       line->state = VALID;
       line->tag = tag;
@@ -217,19 +254,21 @@ bool handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action
     } else if (action == STORE) {
       line->state = VALID;
       line->tag = tag;
-      line->dirty_f = true;
+      line->dirty_f = true; // additionally set dirty: brought into cache and written
       cache->lru_way[index] = (way + 1) % cache->assoc;
     } else {
+      // otherwise, LD_MISS or ST_MISS
       // check if dirty
       bool dirty = line->dirty_f;
-      if (!dirty) {
-        line->state = INVALID;
-      } else {
+      line->state = INVALID; // if not dirty, just invalidate
+      if (dirty){
+        // otherwise, requires writeback
         // Writeback
         writeback_f = true;
         line->dirty_f = false;
       }
     }
+    // then, update the stats
     update_stats(cache->stats, hit, writeback_f, false, action);
   }
   return hit;
@@ -238,18 +277,21 @@ bool handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action
 
 //helper 3: handle MSI protocol
 bool handle_msi_protocol(cache_t *cache, unsigned long addr, enum action_t action) {
-  unsigned long index = get_cache_index(cache, addr);
-  unsigned long tag = get_cache_tag(cache, addr);
-  int way = cache->lru_way[index];
-  bool hit = false;
-  bool writeback_f = false;
+  unsigned long index = get_cache_index(cache, addr); // obtain target index
+  unsigned long tag = get_cache_tag(cache, addr); // obtain target tag
+  
+  int way = cache->lru_way[index]; // tracks which way our line is in. starts here to make lru updating easier. 
+  bool hit = false; // flag to indicate whether we got a hit
+  bool writeback_f = false; // flag to indicate whether to writeback
 
-  bool upgrade_miss = false;
+  bool upgrade_miss = false; // flag to indicate whether an upgrade miss occurred
 
   // Search for the address in the cache
   for (int i = 0; i < cache->assoc; i++) {
+    // if the tag matches and the line is valid,
     if (cache->lines[index][i].tag == tag) {
       if (cache->lines[index][i].state != INVALID){
+          // set the hit flag, update the way, and exit the loop
           hit = true;
           way = i;
           break;
@@ -257,70 +299,75 @@ bool handle_msi_protocol(cache_t *cache, unsigned long addr, enum action_t actio
     }
   }
 
+// get a pointer to the line we found for easier operations
+  cache_line_t *line = &cache->lines[index][way];
+
+  // log the way and index
   log_way(way);
   log_set(index);
 
   if (hit) {
     // Cache hit
-    cache_line_t *line = &cache->lines[index][way];
     if (action == LOAD) {
+      // if the line was modified or shared, change state to shared
       if (line->state == MODIFIED || line->state == SHARED) {
         line->state = SHARED;
       }
-      cache->lru_way[index] = (way + 1) % cache->assoc;
+      cache->lru_way[index] = (way + 1) % cache->assoc; // update LRU way
     } else if (action == STORE) {
       if (line->state == SHARED) {
-      // if (line->state == MODIFIED || line->state == SHARED) {
+        // if line was shared, upgrade miss
         line->state = MODIFIED;
-        //upgrade miss
         hit = false;
         upgrade_miss = true;
       }
+      //! not using dirty bit: correct?
     } else if (action == ST_MISS) {
       // Cache miss
-      bool dirty = (line->state == MODIFIED);
+      bool dirty = (line->state == MODIFIED); // if modified, was dirty
       if (dirty) {
         writeback_f = true;
         line->state = INVALID;
       }
     } else if (action == LD_MISS) {
       // Cache miss
-      bool dirty = line->state == MODIFIED;
+      bool dirty = (line->state == MODIFIED); // if modified, was dirty
       if (dirty) {
         writeback_f = true;
         line->state = SHARED;
       }
     }
+    // then, update the stats
     update_stats(cache->stats, hit, writeback_f, upgrade_miss, action);
   }
   else {
     // Cache miss
-    cache_line_t *line = &cache->lines[index][way];
-    writeback_f = (line->state == MODIFIED);
+    writeback_f = (line->state == MODIFIED); // if modified, requires writeback
     bool dirty = line->state == MODIFIED;
+    int way = cache->lru_way[index];
 
     if (action == LOAD) {
-      int way = cache->lru_way[index];
-
+      // if from a load,
       if (dirty) {
-        writeback_f = true;
+        writeback_f = true; // if dirty, requires writeback
       }
-      line->state = SHARED;
-      line->tag = tag;
+      line->state = SHARED; // update MSI state
+
+      // update tag and LRU
+      line->tag = tag; 
       cache->lru_way[index] = (way + 1) % cache->assoc;
     } else if (action == STORE) {
-      int way = cache->lru_way[index];
+      // if from a store,
       if (dirty) {
-        writeback_f = true;
+        writeback_f = true; // if dirty, requires writeback
       }
-      line->state = MODIFIED;
+      line->state = MODIFIED; // update MSI state
+
+      // update tag and LRU
       line->tag = tag;
       cache->lru_way[index] = (way + 1) % cache->assoc;
-    } 
-    // else {
-      
-      // line->state = INVALID;
-    // }
+    }
+    // then, update the stats
     update_stats(cache->stats, hit, writeback_f, false, action);
   }
   return hit;
