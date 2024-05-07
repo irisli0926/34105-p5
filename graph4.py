@@ -12,7 +12,7 @@ bsize_range = [b for b in range(2, 15)]
 # capacity range (constant 64 KB)
 cap_range = [c for c in range(16, 17)]
 # number of cores (1, 2, 4)
-cores = [1]
+cores = [1,2,4]
 # coherence protocol: (none, vi, or msi)
 protocol='vi'
 
