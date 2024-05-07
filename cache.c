@@ -14,19 +14,16 @@ cache_t *make_cache(int capacity, int block_size, int assoc, enum protocol_t pro
   cache->block_size = block_size;  // in Bytes
   cache->assoc = assoc;            // 1, 2, 3... etc.
 
-  // FIX THIS CODE!
-  // first, correctly set these 5 variables. THEY ARE ALL WRONG
-  // note: you may find math.h's log2 function useful
-  cache->n_cache_line = capacity / block_size;
-  cache->n_set = capacity / (block_size * assoc);
-  cache->n_offset_bit = log2(block_size);
-  cache->n_index_bit = log2(cache->n_set);
-  cache->n_tag_bit = 32 - cache->n_index_bit - cache->n_offset_bit;
+  // cache parameters
+  cache->n_cache_line = capacity / block_size; // number of sets is capacity / block size
+  cache->n_set = capacity / (block_size * assoc); // number of sets is capacity / (block size * associativity)
+  cache->n_offset_bit = log2(block_size); // log2 bits required to index the block size
+  cache->n_index_bit = log2(cache->n_set); // log2 bits required to index the number of sets
+  cache->n_tag_bit = 32 - cache->n_index_bit - cache->n_offset_bit; // remaining bits are tag
 
   // next create the cache lines and the array of LRU bits
   // - malloc an array with n_rows
   // - for each element in the array, malloc another array with n_col
-  // FIX THIS CODE!
 
   // allocate lines: number of lines / sets times the size of the container for each line
   // the container is a pointer to cache_line_t, as each line points to an array representing the 'ways'
@@ -47,7 +44,6 @@ cache_t *make_cache(int capacity, int block_size, int assoc, enum protocol_t pro
 
   // initializes cache tags to 0, dirty bits to false,
   // state to INVALID, and LRU bits to 0
-  // FIX THIS CODE!
 
   // for every set,
   for (int i = 0; i < cache->n_set; i++) {
@@ -153,6 +149,7 @@ bool handle_no_coherence_protocol(cache_t *cache, unsigned long addr, enum actio
     if (action == STORE) {
       line->dirty_f = true;
     }
+    // do nothing on LD_MISS or ST_MISS
   } else {
     // Cache miss
 
@@ -217,18 +214,17 @@ bool handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action
 
     // On load or store from active core,
     // Update the LRU way for the current cache index
-    if (action == LOAD) {
-      cache->lru_way[index] = (way + 1) % cache->assoc;
-    } else if (action == STORE) {
-      line->dirty_f = true; // on store, additionally update dirty bit
-      cache->lru_way[index] = (way + 1) % cache->assoc;
+    if (action == LOAD || action == STORE) {
+      if (action == STORE){
+        line->dirty_f = true; // on store, additionally update dirty bit
+      }
+      cache->lru_way[index] = (way + 1) % cache->assoc; // update LRU
     } else {
       // LD_MISS or ST_MISS
-      //! potentially not required?
       bool dirty = line->dirty_f; // check if dirty
 
       line->state = INVALID; // invalidate 
-      hit = false; // set hit to false
+      hit = false; // also set hit to false
 
       // if the line was dirty,
       if (dirty) {
@@ -238,30 +234,28 @@ bool handle_vi_protocol(cache_t *cache, unsigned long addr, enum action_t action
     }
   } else {
     // Cache miss
-    writeback_f = line->dirty_f; // if dirty, requires writeback
 
     // if active core operation, bring data into cache and set LRU way.
-    if (action == LOAD) {
+    if (action == LOAD || action == STORE) {
+      writeback_f = line->dirty_f; // if dirty, requires writeback
+      // set valid state and tag
       line->state = VALID;
       line->tag = tag;
-      cache->lru_way[index] = (way + 1) % cache->assoc;
-    } else if (action == STORE) {
-      line->state = VALID;
-      line->tag = tag;
-      line->dirty_f = true; // additionally set dirty: brought into cache and written
-      cache->lru_way[index] = (way + 1) % cache->assoc;
-    } else {
+      if (action == STORE){
+        line->dirty_f = true; // additionally set dirty: brought into cache and written
+      }
+      cache->lru_way[index] = (way + 1) % cache->assoc; // update LRU
+    }/*  else {
       // otherwise, LD_MISS or ST_MISS
-      // check if dirty
-      bool dirty = line->dirty_f;
-      line->state = INVALID; // if not dirty, just invalidate
+      bool dirty = line->dirty_f; // check if dirty
+
+      line->state = INVALID; // invalidate
       if (dirty){
-        // otherwise, requires writeback
-        // Writeback
+        // otherwise, requires writeback: set flag for stats, and reset line's dirty state
         writeback_f = true;
         line->dirty_f = false;
       }
-    }
+    } */
   }
   // then, update the stats
   update_stats(cache->stats, hit, writeback_f, false, action);
@@ -306,26 +300,26 @@ bool handle_msi_protocol(cache_t *cache, unsigned long addr, enum action_t actio
       // transition on load for M and S keeps the state the same, so just update LRU way
       cache->lru_way[index] = (way + 1) % cache->assoc; // update LRU way
     } else if (action == STORE) {
-      // only relevant transition is from S to M
+      // only relevant transition is from S to M: M stays M
       if (line->state == SHARED) {
         // if line was shared, upgrade miss
         line->state = MODIFIED; // next state transition
-        hit = false; //! necessary?
+        hit = false; // necessary for the way that we handle stats
         upgrade_miss = true;
       }
       cache->lru_way[index] = (way + 1) % cache->assoc; // update LRU way
     } else if (action == ST_MISS) {
-      // Cache miss: M and S both transition to invalid
+      // Store miss: M and S both transition to invalid
       bool dirty = (line->state == MODIFIED); // if modified, was dirty
       line->state = INVALID;
       if (dirty) {
-        writeback_f = true;
+        writeback_f = true; // if dirty, requires writeback
       }
     } else if (action == LD_MISS) {
-      // Cache miss
+      // Load miss: if on M, transition to S
       bool dirty = (line->state == MODIFIED); // if modified, was dirty
       if (dirty) {
-        writeback_f = true;
+        writeback_f = true; // if dirty, requires writeback
         line->state = SHARED; // only M goes to S on ldmiss, S stays in S
       }
     }

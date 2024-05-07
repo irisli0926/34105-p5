@@ -39,27 +39,39 @@ cache_stats_t *make_cache_stats() {
  * also need to update total_snoop_hits, total_bus_snoops
 */
 void update_stats(cache_stats_t *stats, bool hit_f, bool writeback_f, bool upgrade_miss_f, enum action_t action) {
-  
-  if (action == STORE)
-    stats->n_stores++;
-
-  
-  if (upgrade_miss_f)
-    stats->n_upgrade_miss++;
-  
   if (action == STORE || action == LOAD){
-    //! fixes access counts and hit/miss counts during multicore
+    // only loads and stores from the current core should be counted as accesses
     stats->n_cpu_accesses++;
-    if (hit_f)
+
+    // if a store, increment the relevant stat
+    if (action == STORE)
+      stats->n_stores++;
+
+    // if got a hit from active core, increment the relevant stat
+    if (hit_f){
       stats->n_hits++;
-    if (writeback_f)
-    stats->n_writebacks++;
+    }
+    
+    // if needed to writeback, increment the relevant stat
+    if (writeback_f){
+      stats->n_writebacks++;
+    }
+
+    // if encountered an upgrade miss, increment the relevant stat (MSI)
+    // happens only to stores
+    if (upgrade_miss_f){
+      stats->n_upgrade_miss++;
+    }
   }
 
   if (action == ST_MISS || action == LD_MISS){
+    // if a snoop, increment relevant stat
     stats->n_bus_snoops++;
-    if (hit_f)
+
+    // if the snoop hit, increment the relevant stat
+    if (hit_f){
       stats->n_snoop_hits++;
+    }
   }
     
 }
@@ -69,14 +81,13 @@ void calculate_stat_rates(cache_stats_t *stats, int block_size) {
 
   stats->hit_rate = stats->n_hits / (double)stats->n_cpu_accesses;
 
-  // FIX THIS CODE!
-  // you will need to modify this function in order to properly
-  // calculate wb and wt data
+  // miss count: number of accesses minus number of hits and upgrade misses: upgrade misses shouldn't generate traffic
   unsigned int n_misses = stats->n_cpu_accesses - stats->n_hits - stats->n_upgrade_miss;
-  stats->B_bus_to_cache = n_misses * block_size;
-  stats->B_cache_to_bus_wb = stats->n_writebacks * block_size;
-  stats->B_cache_to_bus_wt = stats->n_stores * 4;
-  stats->B_total_traffic_wb = stats->B_bus_to_cache + stats->B_cache_to_bus_wb;
-  stats->B_total_traffic_wt = stats->B_bus_to_cache + stats->B_cache_to_bus_wt;
+
+  stats->B_bus_to_cache = n_misses * block_size; // traffic into cache: miss count times block size
+  stats->B_cache_to_bus_wb = stats->n_writebacks * block_size; // directly multiply writeback count by bus size
+  stats->B_cache_to_bus_wt = stats->n_stores * 4; // assume that writethroughs always just write the current word back
+  stats->B_total_traffic_wb = stats->B_bus_to_cache + stats->B_cache_to_bus_wb; // total writeback traffic is bus->cache plus writeback traffic
+  stats->B_total_traffic_wt = stats->B_bus_to_cache + stats->B_cache_to_bus_wt; // total writethrough traffic is bus to cache plus writethrough traffic
 
 }
