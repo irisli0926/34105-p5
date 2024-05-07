@@ -4,11 +4,11 @@ Trace  		trace.1t.long.txt
 Instruction Limit 	none
  *** Cache Configuration *** 
 capacity   		65536 B
-block_size 		 1024 B
+block_size 		  256 B
 associativity 		4-way
-n_set 			16
-n_cache_line 	64
-tag: 18, index: 4, offset: 10
+n_set 			64
+n_cache_line 	256
+tag: 18, index: 6, offset: 8
 Coherence Protocol: 	msi
 lru_on_invalidate_f: 	false
 Processing trace...
@@ -18,17 +18,17 @@ Processed 100457 lines.
 0.n_cpu_accesses 	100457
 0.n_loads 		78301
 0.n_stores 		22156
-0.n_hits 		91509
-0.n_misses 		8948
-0.hit_rate 		91.09
-0.miss_rate 		8.91
-0.n_upgrade_miss 	3769
+0.n_hits 		96352
+0.n_misses 		4105
+0.hit_rate 		95.91
+0.miss_rate 		4.09
+0.n_upgrade_miss 	213
 0.n_bus_snoops 	0
 0.n_snoop_hits 	0
-0.n_writebacks 	594
+0.n_writebacks 	0
 Memory Traffic:
-0.B_written_bus_to_cache 	5303296
-0.B_written_cache_to_bus_wb 	608256
+0.B_written_bus_to_cache 	996352
+0.B_written_cache_to_bus_wb 	0
 0.B_written_cache_to_bus_wt 	88624
-0.B_total_traffic_wb 	5911552
-0.B_total_traffic_wt 	5391920
+0.B_total_traffic_wb 	996352
+0.B_total_traffic_wt 	1084976
